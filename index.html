@@ -16,13 +16,16 @@
 <div id="map" style="height: 400px; width: 100%;"></div>
 
     <script>
-        // Initialize Leaflet Map centered on a default spot
+        // 1. Initialize Leaflet Map
         var map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
         var marker = L.marker([0, 0]).addTo(map);
 
+        // 2. Firebase Config
         const firebaseConfig = {
-            apiKey: "AIzaSyAWH3csnKQB2atKdm0p2o4LxmOkYD25dhM", // Get this from Firebase Project Settings
+            apiKey: "AIzaSyAWH3csnKQB2atKdm0p2o4LxmOkYD25dhM", 
             databaseURL: "https://smartwatch-demo-2fe0e-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "smartwatch-demo-2fe0e",
         };
@@ -30,34 +33,40 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Add this specific listener for the Emergency alert
-        db.ref('Watch/Emergency').on('value', (snapshot) => {
-            const emergencyValue = snapshot.val();
+        // 3. LISTEN FOR ALL DATA
+        db.ref('Watch').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return; // Exit if no data exists
+
+            // Update Temperature
+            if (data.Temperature) {
+                document.getElementById('temp').innerText = data.Temperature.toFixed(1);
+            }
+
+            // Update Emergency Status & UI Colors
             const statusEl = document.getElementById('emergency-status');
-            
-            if(emergencyValue == 1) {
+            if(data.Emergency == 1) {
                 statusEl.innerText = "!! FALL DETECTED !!";
                 statusEl.style.color = "red";
-                document.body.style.backgroundColor = "#ffcccc"; // Light red alert
+                document.body.style.backgroundColor = "#ffcccc";
             } else {
                 statusEl.innerText = "NORMAL";
                 statusEl.style.color = "black";
                 document.body.style.backgroundColor = "white";
             }
-        });
 
-        db.ref('Watch').on('value', (snapshot) => {
-            const data = snapshot.val();
+            // Update Map and Coordinates
             const lat = data.Latitude;
             const lon = data.Longitude;
-
-            // Update Map Marker position
             if(lat && lon) {
                 var newLatLng = new L.LatLng(lat, lon);
                 marker.setLatLng(newLatLng);
+                
+                // Only move the camera if it's the first time or if the position changed significantly
                 map.panTo(newLatLng);
-                map.setZoom(15);
-                document.getElementById('coords').innerText = lat + ", " + lon;
+                if (map.getZoom() < 10) map.setZoom(15); 
+                
+                document.getElementById('coords').innerText = lat.toFixed(4) + ", " + lon.toFixed(4);
             }
         });
     </script>
