@@ -4,16 +4,40 @@
     <title>Smart Watch Dashboard</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        body { font-family: sans-serif; transition: background-color 0.5s; padding: 20px; }
+        .sensor-card { background: #f4f4f4; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #2196F3; }
+        #map { height: 400px; width: 100%; border-radius: 8px; margin-top: 20px; }
+        .emergency { border-left: 5px solid red !important; }
+    </style>
 </head>
 <body>
+
     <h1>Watch Status: <span id="emergency-status">NORMAL</span></h1>
-    <p>Temperature: <span id="temp">--</span> °C</p>
-    <p>Location: <span id="coords">Waiting for GPS...</span></p>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div class="sensor-card" id="status-card">
+        <h3>Environment & Health</h3>
+        <p>Temperature: <b><span id="temp">--</span> °C</b></p>
+        <p>Pressure: <b><span id="pres">--</span> hPa</b></p>
+    </div>
 
-<div id="map" style="height: 400px; width: 100%;"></div>
+    <div class="sensor-card">
+        <h3>Motion (MPU6050)</h3>
+        <p>Accel X: <span id="ax">--</span></p>
+        <p>Accel Y: <span id="ay">--</span></p>
+        <p>Accel Z: <span id="az">--</span></p>
+    </div>
+
+    <div class="sensor-card">
+        <h3>Location</h3>
+        <p>GPS: <span id="coords">Waiting for GPS...</span></p>
+        <p>Satellites: <span id="sats">0</span></p>
+    </div>
+
+    <div id="map"></div>
 
     <script>
         // 1. Initialize Leaflet Map
@@ -36,36 +60,41 @@
         // 3. LISTEN FOR ALL DATA
         db.ref('Watch').on('value', (snapshot) => {
             const data = snapshot.val();
-            if (!data) return; // Exit if no data exists
+            if (!data) return;
 
-            // Update Temperature
-            if (data.Temperature) {
-                document.getElementById('temp').innerText = data.Temperature.toFixed(1);
-            }
+            // --- Update BMP280 Data ---
+            if (data.Temperature) document.getElementById('temp').innerText = data.Temperature.toFixed(1);
+            if (data.Pressure) document.getElementById('pres').innerText = data.Pressure.toFixed(0);
 
-            // Update Emergency Status & UI Colors
+            // --- Update MPU6050 Data ---
+            if (data.AccelX !== undefined) document.getElementById('ax').innerText = data.AccelX;
+            if (data.AccelY !== undefined) document.getElementById('ay').innerText = data.AccelY;
+            if (data.AccelZ !== undefined) document.getElementById('az').innerText = data.AccelZ;
+
+            // --- Update Emergency UI ---
             const statusEl = document.getElementById('emergency-status');
+            const card = document.getElementById('status-card');
             if(data.Emergency == 1) {
                 statusEl.innerText = "!! FALL DETECTED !!";
                 statusEl.style.color = "red";
                 document.body.style.backgroundColor = "#ffcccc";
+                card.classList.add('emergency');
             } else {
                 statusEl.innerText = "NORMAL";
                 statusEl.style.color = "black";
                 document.body.style.backgroundColor = "white";
+                card.classList.remove('emergency');
             }
 
-            // Update Map and Coordinates
+            // --- Update GPS & Map ---
+            document.getElementById('sats').innerText = data.Satellites || 0;
             const lat = data.Latitude;
             const lon = data.Longitude;
             if(lat && lon) {
                 var newLatLng = new L.LatLng(lat, lon);
                 marker.setLatLng(newLatLng);
-                
-                // Only move the camera if it's the first time or if the position changed significantly
                 map.panTo(newLatLng);
                 if (map.getZoom() < 10) map.setZoom(15); 
-                
                 document.getElementById('coords').innerText = lat.toFixed(4) + ", " + lon.toFixed(4);
             }
         });
