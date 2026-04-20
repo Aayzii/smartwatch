@@ -16,8 +16,8 @@ TinyGPSPlus gps;
 #define WIFI_PASSWORD "only1gbsad"
 
 // Firebase Credentials (We will fill these later)
-#define FIREBASE_HOST "smartwatch-demo-7b4ef-default-rtdb.asia-southeast1.firebasedatabase.app" 
-#define FIREBASE_AUTH "egS5X0IIzEq7OhjWz3pYoIKMS7zQAE79csCimOtP"
+#define FIREBASE_HOST "" 
+#define FIREBASE_AUTH ""
 
 FirebaseData fbdo;
 FirebaseAuth auth;
