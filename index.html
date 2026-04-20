@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Watch Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+    <h1>Watch Status: <span id="emergency-status">NORMAL</span></h1>
+    <p>Temperature: <span id="temp">--</span> °C</p>
+    <p>Location: <span id="coords">Waiting for GPS...</span></p>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div id="map" style="height: 400px; width: 100%;"></div>
+
+    <script>
+        // Initialize Leaflet Map centered on a default spot
+        var map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        var marker = L.marker([0, 0]).addTo(map);
+
+        // ... (Your Firebase Init code here) ...
+
+        db.ref('Watch').on('value', (snapshot) => {
+            const data = snapshot.val();
+            const lat = data.Latitude;
+            const lon = data.Longitude;
+
+            // Update Map Marker position
+            if(lat && lon) {
+                var newLatLng = new L.LatLng(lat, lon);
+                marker.setLatLng(newLatLng);
+                map.panTo(newLatLng);
+                map.setZoom(15);
+                document.getElementById('coords').innerText = lat + ", " + lon;
+            }
+        });
+    </script>
+</body>
+</html>
