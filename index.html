@@ -21,7 +21,30 @@
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         var marker = L.marker([0, 0]).addTo(map);
 
-        // ... (Your Firebase Init code here) ...
+        const firebaseConfig = {
+            apiKey: "YOUR_NEW_WEB_API_KEY", // Get this from Firebase Project Settings
+            databaseURL: "https://smartwatch-demo-2fe0e-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "smartwatch-demo-2fe0e",
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Add this specific listener for the Emergency alert
+        db.ref('Watch/Emergency').on('value', (snapshot) => {
+            const emergencyValue = snapshot.val();
+            const statusEl = document.getElementById('emergency-status');
+            
+            if(emergencyValue == 1) {
+                statusEl.innerText = "!! FALL DETECTED !!";
+                statusEl.style.color = "red";
+                document.body.style.backgroundColor = "#ffcccc"; // Light red alert
+            } else {
+                statusEl.innerText = "NORMAL";
+                statusEl.style.color = "black";
+                document.body.style.backgroundColor = "white";
+            }
+        });
 
         db.ref('Watch').on('value', (snapshot) => {
             const data = snapshot.val();
