@@ -1,103 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Smart Watch Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Watch Pro Dashboard</title>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <style>
-        body { font-family: sans-serif; transition: background-color 0.5s; padding: 20px; }
-        .sensor-card { background: #f4f4f4; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #2196F3; }
-        #map { height: 400px; width: 100%; border-radius: 8px; margin-top: 20px; }
-        .emergency { border-left: 5px solid red !important; }
+        /* 1. Full Page Map Setup */
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; transition: filter 0.5s; }
+
+        /* 2. Floating Data Panel (Left) */
+        .side-panel {
+            position: absolute; top: 20px; left: 20px; z-index: 10;
+            width: 220px; display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .glass-card h3 { margin: 0 0 8px 0; font-size: 0.9rem; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .glass-card p { margin: 5px 0; font-weight: bold; font-size: 1.1rem; color: #222; }
+        .glass-card span { color: #2196F3; }
+
+        /* 3. Top Right Info */
+        .top-info {
+            position: absolute; top: 20px; right: 20px; z-index: 10;
+            text-align: right; pointer-events: none;
+        }
+        .last-update { font-size: 0.8rem; background: rgba(0,0,0,0.6); color: white; padding: 5px 12px; border-radius: 20px; }
+
+        /* 4. Action Button (Bottom Right) */
+        .action-btn {
+            position: absolute; bottom: 30px; right: 30px; z-index: 10;
+            width: 70px; height: 70px; border-radius: 50%;
+            background: #2196F3; color: white; border: none;
+            cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            font-weight: bold; font-size: 0.8rem; transition: transform 0.2s, background 0.2s;
+        }
+        .action-btn:active { transform: scale(0.9); background: #1976D2; }
+
+        /* 5. Emergency Overlay */
+        #emergency-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 0, 0, 0.4);
+            z-index: 5; display: none; pointer-events: none;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+            100% { opacity: 0.4; }
+        }
+
+        /* Mobile Optimization */
+        @media (max-width: 600px) {
+            .side-panel { width: calc(100% - 40px); flex-direction: row; flex-wrap: wrap; }
+            .glass-card { flex: 1; min-width: 120px; padding: 10px; }
+            .action-btn { width: 60px; height: 60px; bottom: 20px; right: 20px; }
+        }
     </style>
 </head>
 <body>
 
-    <h1>Watch Status: <span id="emergency-status">NORMAL</span></h1>
-
-    <div class="sensor-card" id="status-card">
-        <h3>Environment & Health</h3>
-        <p>Temperature: <b><span id="temp">--</span> °C</b></p>
-        <p>Pressure: <b><span id="pres">--</span> hPa</b></p>
-    </div>
-
-    <div class="sensor-card">
-        <h3>Motion (MPU6050)</h3>
-        <p>Accel X: <span id="ax">--</span></p>
-        <p>Accel Y: <span id="ay">--</span></p>
-        <p>Accel Z: <span id="az">--</span></p>
-    </div>
-
-    <div class="sensor-card">
-        <h3>Location</h3>
-        <p>GPS: <span id="coords">Waiting for GPS...</span></p>
-        <p>Satellites: <span id="sats">0</span></p>
-    </div>
-
+    <div id="emergency-overlay"></div>
     <div id="map"></div>
 
+    <div class="top-info">
+        <div class="last-update">Last Update: <span id="sync-time">--:--:--</span></div>
+    </div>
+
+    <div class="side-panel">
+        <div class="glass-card" id="main-status">
+            <h3>Status</h3>
+            <p id="emergency-status">NORMAL</p>
+        </div>
+
+        <div class="glass-card">
+            <h3>Environment</h3>
+            <p>Temp: <span id="temp">--</span>°C</p>
+            <p>Pres: <span id="pres">--</span>hPa</p>
+        </div>
+
+        <div class="glass-card">
+            <h3>Motion</h3>
+            <p>X:<span id="ax">--</span> Y:<span id="ay">--</span></p>
+            <p>Z:<span id="az">--</span></p>
+        </div>
+
+        <div class="glass-card">
+            <h3>GPS</h3>
+            <p>Sats: <span id="sats">0</span></p>
+            <p style="font-size: 0.7rem;" id="coords">Searching...</p>
+        </div>
+    </div>
+
+    <button class="action-btn" onclick="triggerMotor()">ACTIVATE<br>MOTOR</button>
+
     <script>
-        // 1. Initialize Leaflet Map
-        var map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        // --- 1. Map Setup ---
+        var map = L.map('map', { zoomControl: false }).setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         var marker = L.marker([0, 0]).addTo(map);
 
-        // 2. Firebase Config
+        // --- 2. Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyAWH3csnKQB2atKdm0p2o4LxmOkYD25dhM", 
             databaseURL: "https://smartwatch-demo-2fe0e-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "smartwatch-demo-2fe0e",
         };
-        
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 3. LISTEN FOR ALL DATA
+        // --- 3. Data Sync ---
         db.ref('Watch').on('value', (snapshot) => {
             const data = snapshot.val();
             if (!data) return;
 
-            // --- Update BMP280 Data ---
+            // Update Time
+            document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+
+            // Environment
             if (data.Temperature) document.getElementById('temp').innerText = data.Temperature.toFixed(1);
             if (data.Pressure) document.getElementById('pres').innerText = data.Pressure.toFixed(0);
 
-            // --- Update MPU6050 Data ---
-            if (data.AccelX !== undefined) document.getElementById('ax').innerText = data.AccelX;
-            if (data.AccelY !== undefined) document.getElementById('ay').innerText = data.AccelY;
-            if (data.AccelZ !== undefined) document.getElementById('az').innerText = data.AccelZ;
+            // Motion
+            document.getElementById('ax').innerText = data.AccelX || "--";
+            document.getElementById('ay').innerText = data.AccelY || "--";
+            document.getElementById('az').innerText = data.AccelZ || "--";
 
-            // --- Update Emergency UI ---
+            // Emergency
             const statusEl = document.getElementById('emergency-status');
-            const card = document.getElementById('status-card');
+            const overlay = document.getElementById('emergency-overlay');
             if(data.Emergency == 1) {
-                statusEl.innerText = "!! FALL DETECTED !!";
+                statusEl.innerText = "FALL DETECTED";
                 statusEl.style.color = "red";
-                document.body.style.backgroundColor = "#ffcccc";
-                card.classList.add('emergency');
+                overlay.style.display = "block";
             } else {
                 statusEl.innerText = "NORMAL";
-                statusEl.style.color = "black";
-                document.body.style.backgroundColor = "white";
-                card.classList.remove('emergency');
+                statusEl.style.color = "#2196F3";
+                overlay.style.display = "none";
             }
 
-            // --- Update GPS & Map ---
+            // Location
             document.getElementById('sats').innerText = data.Satellites || 0;
-            const lat = data.Latitude;
-            const lon = data.Longitude;
-            if(lat && lon) {
-                var newLatLng = new L.LatLng(lat, lon);
+            if(data.Latitude && data.Longitude) {
+                var newLatLng = new L.LatLng(data.Latitude, data.Longitude);
                 marker.setLatLng(newLatLng);
                 map.panTo(newLatLng);
-                if (map.getZoom() < 10) map.setZoom(15); 
-                document.getElementById('coords').innerText = lat.toFixed(4) + ", " + lon.toFixed(4);
+                if (map.getZoom() < 10) map.setZoom(17);
+                document.getElementById('coords').innerText = data.Latitude.toFixed(4) + ", " + data.Longitude.toFixed(4);
             }
         });
+
+        // --- 4. Trigger Motor Function ---
+        function triggerMotor() {
+            // We set a temporary "MotorTrigger" value in Firebase
+            // Your ESP32 should listen for this value in the loop
+            db.ref('Watch/MotorRemote').set(1);
+            
+            // Auto-reset after 2 seconds so it doesn't vibrate forever
+            setTimeout(() => {
+                db.ref('Watch/MotorRemote').set(0);
+            }, 2000);
+            
+            alert("Motor Trigger Sent to Watch!");
+        }
     </script>
 </body>
 </html>

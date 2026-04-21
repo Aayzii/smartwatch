@@ -13,6 +13,8 @@
 #define OLED_ADDR 0x3C
 #define SDA_PIN 21
 #define SCL_PIN 22
+#define MIC_PIN 34
+#define THRESHOLD 2000
 
 // --- Objects ---
 TinyGPSPlus gps;
@@ -97,6 +99,17 @@ void loop() {
             Firebase.setInt(fbdo, "/Watch/Emergency", 0);
             lastEmergencyState = 0;
         }
+    }
+
+    // Inside loop()
+    int remoteMotor = 0;
+    Firebase.getInt(fbdo, "/Watch/MotorRemote");
+    remoteMotor = fbdo.intData();
+
+    if (remoteMotor == 1 || currentEmergency == 1) {
+        digitalWrite(MOTOR_PIN, HIGH);
+    } else {
+        digitalWrite(MOTOR_PIN, LOW);
     }
 
     // D. Normal Display Update (Every 1 Second)
